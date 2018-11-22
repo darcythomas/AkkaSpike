@@ -29,7 +29,7 @@ namespace AkkaSpike
         public PlaceOrder() {}
         public PlaceOrder(int orderId) { OrderId = orderId;
 
-            Receive(message => {
+            Command<PlaceOrderItem>(message => {
 
                 Console.WriteLine("here");
 
@@ -43,7 +43,7 @@ namespace AkkaSpike
         public override string PersistenceId => $"{nameof(PlaceOrder)}-{OrderId}";
 
 
-        protected override  
+       
         
     }
     public class PlaceOrderItem
