@@ -1,4 +1,5 @@
 ﻿using Akka.Actor;
+using Akka.Configuration;
 using Akka.Persistence;
 using System;
 using System.Collections.Generic;
@@ -13,18 +14,33 @@ namespace AkkaSpike
         {
             Console.WriteLine("Begin ");
 
-          
+            var config = ConfigurationFactory.ParseString(@"
+ 
+      akka.persistence
+      {
+        journal
+        {
+          plugin = ""akka.persistence.journal.sql-server""
+          sql-server
+          {
+              class = ""Akka.Persistence.SqlServer.Journal.SqlServerJournal, Akka.Persistence.SqlServer""
+              schema-name = dbo
+              auto-initialize = on
+              connection-string = ""Data Source=(localdb)\\MSSQLLocalDB;Initial Catalog=AkkaSpike;Integrated Security=True;Connect Timeout=30;Encrypt=False;TrustServerCertificate=False;ApplicationIntent=ReadWrite;MultiSubnetFailover=False""
+          }
+        }
+      }");
 
-            using (var system = ActorSystem.Create("my-actor-server"))
+            using (var system = ActorSystem.Create("my-actor-server",config))
             {
                 bool keepLooping = true;
                 while (keepLooping)
                 {
                     string[] command =   Console.ReadLine().ToLower().Split(' ');
 
+                    var name = $"{nameof(OrderActor)}-{command.Skip(1).FirstOrDefault() ?? "0"}";
 
-
-                    var orderActor = system.ActorOf(Props.Create(() => new OrderActor(command.Skip(1).FirstOrDefault()?? "0") ));
+                    var orderActor = system.ActorOf(Props.Create(() => new OrderActor(name) ));
 
                     switch (command[0])
                     {
@@ -126,7 +142,7 @@ namespace AkkaSpike
         public List<String> Events { get; set; }
         public string OrderId  { get; set; }
      
-        public override string PersistenceId => $"{nameof(OrderActor)}-{OrderId}";
+        public override string PersistenceId => OrderId;
 
 
 
