@@ -2,6 +2,7 @@
 using Akka.Persistence;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace AkkaSpike
 {
@@ -9,7 +10,7 @@ namespace AkkaSpike
     {
         static void Main(string[] args)
         {
-            Console.WriteLine("Hello World!");
+            Console.WriteLine("Begin ");
 
           
 
@@ -17,25 +18,47 @@ namespace AkkaSpike
             {
                 //start two services
                 var service1 = system.ActorOf<PlaceOrder>($"{nameof(PlaceOrder)}");
-              //  var service2 = system.ActorOf<Service2>("service2");
+                //  var service2 = system.ActorOf<Service2>("service2");
+           
+                var basicActorX = system.ActorOf<PlaceOrder>();
+                basicActorX.Tell(new PlaceOrderItem());
+
+                var basicActor = system.ActorOf<BasicActor>();
+                basicActor.Tell("Hello World!");
+
+                Thread.Sleep(1000);
                 Console.ReadKey();
             }
         }
     }
 
+    public class BasicActor : UntypedActor
+    {
+        protected override void OnReceive(object message)
+        {
+            if (message is int  msg)
+            {                
+                Console.WriteLine(msg);
+            }
+        }
+    }
 
     public class PlaceOrder : ReceivePersistentActor
     {
-        public PlaceOrder() {}
-        public PlaceOrder(int orderId) { OrderId = orderId;
+        public PlaceOrder() {
 
-            Command<PlaceOrderItem>(message => {
+            Command<PlaceOrderItem>(message =>
+            {
 
                 Console.WriteLine("here");
 
+               
             });
         }
 
+        //public override 
+
+       
 
         public List<String> Events { get; set; }
         public int OrderId  { get; set; }
