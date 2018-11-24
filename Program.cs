@@ -1,16 +1,19 @@
 ﻿using Akka.Actor;
 using Akka.Configuration;
 using Akka.Persistence;
-using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
-using System.Threading;
+using Console = Colorful.Console;
 
 namespace AkkaSpike
 {
-    class Program
+    public class Program
     {
-        static void Main(string[] args)
+        public static ActorSystem system;
+        public static bool keepLooping = true;
+
+        private static void Main(string[] args)
         {
             Console.WriteLine("Begin ");
 
@@ -31,69 +34,99 @@ namespace AkkaSpike
         }
       }");
 
-            using (var system = ActorSystem.Create("my-actor-server",config))
+            using (system = ActorSystem.Create("my-actor-server", config))
             {
                 bool keepLooping = true;
+                var orderCoordinator = system.ActorOf(Props.Create(() => new OrderCoordinator()));
                 while (keepLooping)
                 {
-                    string[] command =   Console.ReadLine().ToLower().Split(' ');
+                    string command = Console.ReadLine().ToLower();
 
-                    var name = $"{nameof(OrderActor)}-{command.Skip(1).FirstOrDefault() ?? "0"}";
-
-                    var orderActor = system.ActorOf(Props.Create(() => new OrderActor(name) ));
-
-                    switch (command[0])
-                    {
-                        case "exit":
-                            keepLooping = false;
-                            break;
-                        case "list":
-                            orderActor.Tell(new GetStatus());
-                            break;
-                        case "place":
-                            orderActor.Tell(new OrderPlaced());
-                            break;
-                        case "ship":
-                            orderActor.Tell(new OrderShipped());
-                            break;
-                        default :
-                            Console.WriteLine("try again");
-                            break;
-                    }
-
+                    orderCoordinator.Tell(command);
                 }
-
-
             }
         }
     }
 
 
     public class OrderCoordinator : UntypedActor
- {
+    {
         protected override void OnReceive(object message)
         {
-            if (message is int msg)
+            if (message is string msg)
             {
-                Console.WriteLine(msg);
+                string[] command = msg.ToLower().Split(' ');
+
+                var name = $"{nameof(OrderActor)}-{command.Skip(1).FirstOrDefault() ?? "0"}";
+
+                // var orderActor = Program.system.ActorOf(Props.Create(() => new OrderActor(name)));
+
+                switch (command[0])
+                {
+                    case "exit":
+                        Program.keepLooping = false;
+                        break;
+                    case "list":
+
+                        var orderActor = Program.system.ActorOf(Props.Create(() => new OrderActor(name)));
+                        orderActor.Tell(new GetStatus());
+                        break;
+                    case "place":
+
+                        var orderIdActor = Program.system.ActorOf(Props.Create(() => new OrderIdActor()));
+                        orderIdActor.Tell(new OrderPlaced());
+                        break;
+                    case "ship":
+
+                        var orderActor2 = Program.system.ActorOf(Props.Create(() => new OrderActor(name)));
+                        orderActor2.Tell(new OrderShipped());
+                        break;
+                    default:
+                        Console.WriteLine("try again");
+                        break;
+                }
             }
         }
     }
 
+    public class OrderIdActor : ReceivePersistentActor
+    {
+
+        public int Id { get; set; }
+
+        public OrderIdActor()
+        {
+            Command<OrderPlaced>(message =>
+            {
+                Persist(message, m =>
+                {
+                    Id++;
+                    var order = Program.system.ActorOf(Props.Create(() => new OrderActor($"{Id}")));
+                    order.Tell(new OrderPlaced());
+                });
+
+            });
+
+            Recover<OrderPlaced>(message => Id++);
+        }
+
+        public override string PersistenceId => nameof(OrderIdActor);
+    }
     public class OrderActor : ReceivePersistentActor
     {
 
-        private List<String> EventLog = new List<string>();
-        public OrderActor(string orderId) {
+        private List<string> EventLog = new List<string>();
+        public OrderActor(string orderId)
+        {
             OrderId = orderId;
 
             Command<OrderPlaced>(message =>
             {
-                Persist(message, m => HandleOrderPlaced(m) );
+                Persist(message, m => HandleOrderPlaced(m));
 
             });
 
-            Recover<OrderPlaced>(message =>  HandleOrderPlaced(message));
+            Recover<OrderPlaced>(message => HandleOrderPlaced(message));
 
             Command<OrderShipped>(message =>
             {
@@ -110,7 +143,7 @@ namespace AkkaSpike
 
             Command<GetStatus>(message =>
             {
-                Console.WriteLine("Listing events");
+                Console.WriteAscii("Listing events", Color.Blue);
                 foreach (var item in EventLog)
                 {
                     Console.WriteLine(item);
@@ -131,18 +164,20 @@ namespace AkkaSpike
 
         private void HandleOrderPlaced(OrderPlaced message)
         {
+            if (!this.IsRecovering)
+            {
+                Console.WriteLine($"New OrderPlaced {OrderId}", Color.BlueViolet);
+
+            }
             Console.WriteLine("OrderPlaced");
             EventLog.Add("OrderPlaced");
         }
 
-        //public override 
 
+        public List<string> Events { get; set; }
+        public string OrderId { get; set; }
 
-
-        public List<String> Events { get; set; }
-        public string OrderId  { get; set; }
-     
-        public override string PersistenceId => OrderId;
+        public override string PersistenceId => $"{nameof(OrderActor)}-{OrderId}";
 
 
 
@@ -157,6 +192,22 @@ namespace AkkaSpike
 
     }
     public class OrderShipped
+    {
+
+    }
+    public class NotifyWarehouse
+    {
+
+    }
+    public class ProcessPayment
+    {
+
+    }
+    public class SendEmailConfirmation
+    {
+
+    }
+    public class SendEmailItemShipped
     {
 
     }
